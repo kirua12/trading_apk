@@ -5,6 +5,7 @@ This guide builds only the Android client in `mobile_expo`. The WMCA bridge stay
 ## Option A: EAS cloud APK
 
 This is the simplest way to create an installable APK from Linux.
+If EAS says the free Android build quota is used up, skip this option and use the local build below.
 
 ```bash
 cd mobile_expo
@@ -18,6 +19,8 @@ The `preview` profile in `eas.json` builds an `.apk` file that can be installed 
 
 ## Option B: Local Android build
 
+This does not use EAS cloud quota.
+
 Requires Linux packages:
 
 - Node.js 18 or newer
@@ -28,11 +31,15 @@ Requires Linux packages:
 Commands:
 
 ```bash
+bash build_android_local.sh
+```
+
+Or run the same steps manually:
+
+```bash
 cd mobile_expo
 npm install
-npx expo prebuild --platform android
-cd android
-./gradlew assembleRelease
+npm run apk:local
 ```
 
 The APK is usually created at:

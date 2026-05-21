@@ -8,6 +8,8 @@
     "android": "expo start --android",
     "web": "expo start --web",
     "prebuild:android": "expo prebuild --platform android",
+    "apk:local": "expo prebuild --platform android --no-install && cd android && ./gradlew assembleRelease",
+    "apk:local:clean": "expo prebuild --platform android --no-install --clean && cd android && ./gradlew clean assembleRelease",
     "apk:cloud": "eas build --platform android --profile preview",
     "aab:cloud": "eas build --platform android --profile production"
   },
