@@ -5,6 +5,11 @@ module.exports = {
     version: "0.1.0",
     orientation: "portrait",
     platforms: ["android"],
+    backgroundColor: "#101418",
+    splash: {
+      backgroundColor: "#101418",
+      resizeMode: "contain"
+    },
     plugins: ["./plugins/withCleartextTraffic"],
     android: {
       package: "com.local.tradingcompanion",
