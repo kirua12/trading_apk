@@ -335,11 +335,15 @@ class BridgeHandler(BaseHTTPRequestHandler):
             raise BridgeError(HTTPStatus.BAD_REQUEST, "password is required")
         keywords = self._keywords_from_body(body)
         press_enter = self._body_bool(body, "press_enter", default=True)
+        target_hwnd = self._body_optional_int(body, "hwnd") or self._body_optional_int(body, "target_hwnd")
+        delay_seconds = self._body_optional_float(body, "delay_seconds", default=0.02)
         try:
             result = type_password_into_candidate(
                 password,
                 keywords=keywords,
+                target_hwnd=target_hwnd,
                 press_enter=press_enter,
+                delay_seconds=delay_seconds,
             )
         except RemoteKeyboardError as exc:
             raise BridgeError(HTTPStatus.CONFLICT, str(exc)) from exc
@@ -408,6 +412,27 @@ class BridgeHandler(BaseHTTPRequestHandler):
         return str(raw).strip().lower() in {"1", "true", "yes", "on"}
 
     @staticmethod
+    def _body_optional_int(body: dict[str, Any], key: str) -> int | None:
+        raw = body.get(key)
+        if raw is None or str(raw).strip() == "":
+            return None
+        try:
+            return int(str(raw).strip())
+        except ValueError as exc:
+            raise BridgeError(HTTPStatus.BAD_REQUEST, f"{key} must be an integer") from exc
+
+    @staticmethod
+    def _body_optional_float(body: dict[str, Any], key: str, *, default: float) -> float:
+        raw = body.get(key)
+        if raw is None or str(raw).strip() == "":
+            return default
+        try:
+            value = float(str(raw).strip())
+        except ValueError as exc:
+            raise BridgeError(HTTPStatus.BAD_REQUEST, f"{key} must be a number") from exc
+        return min(max(value, 0.0), 0.25)
+
+    @staticmethod
     def _keywords_from_query(query: dict[str, list[str]]) -> list[str] | None:
         raw = BridgeHandler._query_optional(query, "keywords") or BridgeHandler._query_optional(query, "q")
         return BridgeHandler._split_keywords(raw)
@@ -449,9 +474,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="PC bridge API for the Android companion app.")
-    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8765)
-    parser.add_argument("--token", default="", help="Bearer token required by the Android app.")
+    parser.add_argument("--token", default="CHANGE_ME", help="Bearer token required by the Android app.")
     parser.add_argument("--db", type=Path, default=PROJECT_ROOT / "data" / "trading.db")
     parser.add_argument("--live-orders", action="store_true", help="Allow mobile manual orders to be sent by default.")
     return parser.parse_args()

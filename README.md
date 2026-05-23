@@ -48,13 +48,18 @@ window. The intended flow is:
 1. Start the bridge with a strong `--token`.
 2. Tap `Connect` in the Android app so WMCA opens the certificate/password UI on the PC.
 3. In `Search` -> `PC Certificate`, enter the certificate password.
-4. Tap `Type to PC`.
+4. Tap `Find Windows`, tap the matching certificate window if several are shown, then tap `Type to PC`.
 
 The bridge only enables this helper when `--token` is set. The password is not
 returned in API responses and is not written to bridge logs. Keep this bridge on
 a trusted private network or VPN only. The bridge must run in the normal Windows
 desktop session where the certificate window is visible, not as a background
 Windows service.
+
+If `Type to PC` says it succeeded but the PC field stays empty, click the
+certificate password input on the PC once and try again. Some certificate
+security modules block synthetic keyboard input; in that case the bridge can
+detect and focus the window, but Windows may still refuse to deliver typed keys.
 
 ## Linux APK build
 

@@ -65,6 +65,7 @@ export default function App() {
   const [certPassword, setCertPassword] = useState("");
   const [certPressEnter, setCertPressEnter] = useState(true);
   const [certWindowKeywords, setCertWindowKeywords] = useState("공동인증서,인증서,비밀번호,전자서명");
+  const [certTargetHwnd, setCertTargetHwnd] = useState("");
   const [pcWindows, setPcWindows] = useState([]);
 
   const [top100, setTop100] = useState([]);
@@ -145,7 +146,10 @@ export default function App() {
   async function refreshPcWindows() {
     const q = encodeURIComponent(certWindowKeywords);
     const data = await run("pc windows", () => api(`/api/pc-windows?keywords=${q}`));
-    if (data) setPcWindows(data);
+    if (data) {
+      setPcWindows(data);
+      if (data.length > 0 && !certTargetHwnd) setCertTargetHwnd(String(data[0].hwnd || ""));
+    }
   }
 
   async function sendCertPassword() {
@@ -156,12 +160,14 @@ export default function App() {
     const body = JSON.stringify({
       password: certPassword,
       press_enter: certPressEnter,
-      keywords: certWindowKeywords
+      keywords: certWindowKeywords,
+      hwnd: certTargetHwnd || undefined
     });
     const data = await run("cert password", () => api("/api/cert/type-password", { method: "POST", body }));
     setCertPassword("");
     if (data) {
-      Alert.alert("Certificate", `Typed ${data.chars_typed} chars into\n${data.window?.title || "PC window"}`);
+      const child = data.child?.class_name ? `\ninput: ${data.child.class_name}` : "";
+      Alert.alert("Certificate", `Typed ${data.chars_typed} chars into\n${data.window?.title || "PC window"}${child}`);
     }
   }
 
@@ -302,11 +308,15 @@ export default function App() {
               <Button title="Type to PC" onPress={sendCertPassword} tone="sell" />
             </View>
             {pcWindows.length === 0 ? <Text style={styles.muted}>Connect first, then send while the certificate password window is visible on the PC.</Text> : null}
-            {pcWindows.slice(0, 3).map((win) => (
-              <View key={`${win.hwnd}-${win.title}`} style={styles.windowRow}>
+            {pcWindows.slice(0, 6).map((win) => (
+              <TouchableOpacity
+                key={`${win.hwnd}-${win.title}`}
+                style={[styles.windowRow, String(win.hwnd) === certTargetHwnd && styles.windowRowActive]}
+                onPress={() => setCertTargetHwnd(String(win.hwnd || ""))}
+              >
                 <Text style={styles.rowTitle} numberOfLines={1}>{win.title}</Text>
                 <Text style={styles.muted} numberOfLines={1}>{win.class_name}</Text>
-              </View>
+              </TouchableOpacity>
             ))}
           </Section>
 
@@ -439,7 +449,7 @@ export default function App() {
         {loading ? <ActivityIndicator color="#8bd4a8" /> : null}
       </View>
       <View style={styles.content}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           {renderActiveTab()}
         </ScrollView>
       </View>
@@ -657,6 +667,7 @@ const styles = StyleSheet.create({
   position: { flexDirection: "row", justifyContent: "space-between", backgroundColor: "#111619", borderRadius: 7, padding: 10, gap: 10 },
   positionRight: { alignItems: "flex-end" },
   windowRow: { backgroundColor: "#111619", borderRadius: 7, padding: 9, gap: 3 },
+  windowRowActive: { borderColor: "#5fc48a", borderWidth: 1 },
   chartBox: {
     backgroundColor: "#1b2022",
     borderColor: "#30383a",
