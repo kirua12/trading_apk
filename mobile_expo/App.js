@@ -26,6 +26,13 @@ const SORTS = [
   { key: "change_rate", label: "Change" }
 ];
 
+const CERT_INPUT_METHODS = [
+  { key: "auto", label: "Auto" },
+  { key: "paste", label: "Paste" },
+  { key: "vk", label: "Key" },
+  { key: "message", label: "Msg" }
+];
+
 const money = (value, suffix = " KRW") => {
   const n = Number(value || 0);
   if (!Number.isFinite(n) || n === 0) return "-";
@@ -66,6 +73,7 @@ export default function App() {
   const [certPressEnter, setCertPressEnter] = useState(true);
   const [certWindowKeywords, setCertWindowKeywords] = useState("공동인증서,인증서,비밀번호,전자서명");
   const [certTargetHwnd, setCertTargetHwnd] = useState("");
+  const [certInputMethod, setCertInputMethod] = useState("auto");
   const [pcWindows, setPcWindows] = useState([]);
 
   const [top100, setTop100] = useState([]);
@@ -161,13 +169,14 @@ export default function App() {
       password: certPassword,
       press_enter: certPressEnter,
       keywords: certWindowKeywords,
-      hwnd: certTargetHwnd || undefined
+      hwnd: certTargetHwnd || undefined,
+      input_method: certInputMethod
     });
     const data = await run("cert password", () => api("/api/cert/type-password", { method: "POST", body }));
     setCertPassword("");
     if (data) {
       const child = data.child?.class_name ? `\ninput: ${data.child.class_name}` : "";
-      Alert.alert("Certificate", `Typed ${data.chars_typed} chars into\n${data.window?.title || "PC window"}${child}`);
+      Alert.alert("Certificate", `Method: ${data.method}\nTyped ${data.chars_typed} chars into\n${data.window?.title || "PC window"}${child}`);
     }
   }
 
@@ -303,6 +312,17 @@ export default function App() {
               <View style={[styles.checkbox, certPressEnter && styles.checkboxOn]} />
               <Text style={styles.switchText}>Press Enter after typing {certPressEnter ? "ON" : "OFF"}</Text>
             </TouchableOpacity>
+            <View style={styles.segment}>
+              {CERT_INPUT_METHODS.map((method) => (
+                <TouchableOpacity
+                  key={method.key}
+                  style={[styles.segmentButton, certInputMethod === method.key && styles.segmentActive]}
+                  onPress={() => setCertInputMethod(method.key)}
+                >
+                  <Text style={[styles.segmentText, certInputMethod === method.key && styles.segmentTextActive]}>{method.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             <View style={styles.row}>
               <Button title="Find Windows" onPress={refreshPcWindows} />
               <Button title="Type to PC" onPress={sendCertPassword} tone="sell" />

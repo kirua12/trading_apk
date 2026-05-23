@@ -50,6 +50,11 @@ window. The intended flow is:
 3. In `Search` -> `PC Certificate`, enter the certificate password.
 4. Tap `Find Windows`, tap the matching certificate window if several are shown, then tap `Type to PC`.
 
+The default input method is `Auto`, which tries clipboard paste first and then
+keyboard/message fallbacks. If a certificate module rejects one method, try the
+`Paste`, `Key`, or `Msg` buttons individually so the bridge response shows which
+path was attempted.
+
 The bridge only enables this helper when `--token` is set. The password is not
 returned in API responses and is not written to bridge logs. Keep this bridge on
 a trusted private network or VPN only. The bridge must run in the normal Windows

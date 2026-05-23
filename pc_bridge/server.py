@@ -337,6 +337,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         press_enter = self._body_bool(body, "press_enter", default=True)
         target_hwnd = self._body_optional_int(body, "hwnd") or self._body_optional_int(body, "target_hwnd")
         delay_seconds = self._body_optional_float(body, "delay_seconds", default=0.02)
+        input_method = str(body.get("input_method") or body.get("method") or "auto")
         try:
             result = type_password_into_candidate(
                 password,
@@ -344,6 +345,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 target_hwnd=target_hwnd,
                 press_enter=press_enter,
                 delay_seconds=delay_seconds,
+                input_method=input_method,
             )
         except RemoteKeyboardError as exc:
             raise BridgeError(HTTPStatus.CONFLICT, str(exc)) from exc
