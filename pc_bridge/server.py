@@ -27,6 +27,12 @@ from src.data.usd_quote import LAOER_TICKER_POOL
 from src.live.laoer_auto import LaoerAutoConfig, LaoerAutoRunner
 from src.live.state import StateRepository
 
+from remote_keyboard import (
+    RemoteKeyboardError,
+    list_candidate_windows,
+    type_password_into_candidate,
+)
+
 
 class BridgeError(Exception):
     def __init__(self, status: HTTPStatus, message: str):
@@ -211,6 +217,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 for row in frame.to_dict("records")
             ]
 
+        if method == "GET" and path == "/api/pc-windows":
+            self._require_remote_keyboard_token()
+            keywords = self._keywords_from_query(query)
+            include_all = self._query_bool(query, "all", default=False)
+            try:
+                windows = list_candidate_windows(keywords, include_all=include_all)
+            except RemoteKeyboardError as exc:
+                raise BridgeError(HTTPStatus.CONFLICT, str(exc)) from exc
+            return [window.safe_dict() for window in windows[:40]]
+
         if method == "POST" and path == "/api/connect":
             with bridge.lock:
                 broker = bridge.get_broker()
@@ -253,6 +269,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
         if method == "POST" and path == "/api/order":
             return self._place_order(bridge, body)
+
+        if method == "POST" and path == "/api/cert/type-password":
+            return self._type_certificate_password(body)
 
         if method == "POST" and path == "/api/laoer/tick":
             return self._laoer_tick(bridge, body)
@@ -309,6 +328,32 @@ class BridgeHandler(BaseHTTPRequestHandler):
             report = runner.tick(config)
         return encode_json(report)
 
+    def _type_certificate_password(self, body: dict[str, Any]) -> dict[str, Any]:
+        self._require_remote_keyboard_token()
+        password = str(body.get("password") or "")
+        if not password:
+            raise BridgeError(HTTPStatus.BAD_REQUEST, "password is required")
+        keywords = self._keywords_from_body(body)
+        press_enter = self._body_bool(body, "press_enter", default=True)
+        try:
+            result = type_password_into_candidate(
+                password,
+                keywords=keywords,
+                press_enter=press_enter,
+            )
+        except RemoteKeyboardError as exc:
+            raise BridgeError(HTTPStatus.CONFLICT, str(exc)) from exc
+        finally:
+            password = ""
+        return result.safe_dict()
+
+    def _require_remote_keyboard_token(self) -> None:
+        if not self._token():
+            raise BridgeError(
+                HTTPStatus.FORBIDDEN,
+                "bridge token is required for remote keyboard endpoints",
+            )
+
     @staticmethod
     def _connected_broker(bridge: BridgeState) -> WmcaBroker:
         broker = bridge.get_broker()
@@ -345,6 +390,47 @@ class BridgeHandler(BaseHTTPRequestHandler):
         except ValueError:
             value = int(default)
         return min(max(value, minimum), maximum)
+
+    @staticmethod
+    def _query_bool(query: dict[str, list[str]], key: str, *, default: bool) -> bool:
+        raw = BridgeHandler._query_optional(query, key)
+        if raw is None:
+            return default
+        return raw.lower() in {"1", "true", "yes", "on"}
+
+    @staticmethod
+    def _body_bool(body: dict[str, Any], key: str, *, default: bool) -> bool:
+        if key not in body:
+            return default
+        raw = body.get(key)
+        if isinstance(raw, bool):
+            return raw
+        return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+    @staticmethod
+    def _keywords_from_query(query: dict[str, list[str]]) -> list[str] | None:
+        raw = BridgeHandler._query_optional(query, "keywords") or BridgeHandler._query_optional(query, "q")
+        return BridgeHandler._split_keywords(raw)
+
+    @staticmethod
+    def _keywords_from_body(body: dict[str, Any]) -> list[str] | None:
+        raw = body.get("keywords")
+        if raw is None:
+            raw = body.get("title_contains")
+        if isinstance(raw, list):
+            return [str(item).strip() for item in raw if str(item).strip()]
+        return BridgeHandler._split_keywords(str(raw) if raw is not None else None)
+
+    @staticmethod
+    def _split_keywords(raw: str | None) -> list[str] | None:
+        if not raw:
+            return None
+        keywords = [
+            part.strip()
+            for part in raw.replace(";", ",").split(",")
+            if part.strip()
+        ]
+        return keywords or None
 
     def _send_headers(self) -> None:
         self.send_header("Content-Type", "application/json; charset=utf-8")

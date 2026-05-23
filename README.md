@@ -40,6 +40,22 @@ In the app, set:
 - Server URL: `http://<PC_LAN_IP>:8765`
 - Token: the value passed with `--token`
 
+## Certificate password helper
+
+The app can act as a remote keyboard for the Windows certificate password
+window. The intended flow is:
+
+1. Start the bridge with a strong `--token`.
+2. Tap `Connect` in the Android app so WMCA opens the certificate/password UI on the PC.
+3. In `Search` -> `PC Certificate`, enter the certificate password.
+4. Tap `Type to PC`.
+
+The bridge only enables this helper when `--token` is set. The password is not
+returned in API responses and is not written to bridge logs. Keep this bridge on
+a trusted private network or VPN only. The bridge must run in the normal Windows
+desktop session where the certificate window is visible, not as a background
+Windows service.
+
 ## Linux APK build
 
 This folder is meant to be its own git repository. On Linux, build only the
@@ -55,5 +71,6 @@ See `BUILD_LINUX.md` for APK and AAB build commands.
 - Check sellable quantity.
 - Send manual limit buy/sell orders through the PC bridge.
 - Run Laoer tick through the existing Laoer runner.
+- Type a one-time certificate password into the visible PC certificate window.
 
 Laoer overseas order is still limited by the current broker implementation: the local WMCA adapter does not yet contain an overseas stock order TR. The bridge will expose the same blocked status rather than sending a wrong domestic order.

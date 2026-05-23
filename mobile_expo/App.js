@@ -62,6 +62,10 @@ export default function App() {
   const [account, setAccount] = useState(null);
   const [positions, setPositions] = useState([]);
   const [events, setEvents] = useState([]);
+  const [certPassword, setCertPassword] = useState("");
+  const [certPressEnter, setCertPressEnter] = useState(true);
+  const [certWindowKeywords, setCertWindowKeywords] = useState("공동인증서,인증서,비밀번호,전자서명");
+  const [pcWindows, setPcWindows] = useState([]);
 
   const [top100, setTop100] = useState([]);
   const [topSort, setTopSort] = useState("trading_value");
@@ -136,6 +140,29 @@ export default function App() {
   async function refreshPositions() {
     const data = await run("positions", () => api("/api/positions"));
     if (data) setPositions(data);
+  }
+
+  async function refreshPcWindows() {
+    const q = encodeURIComponent(certWindowKeywords);
+    const data = await run("pc windows", () => api(`/api/pc-windows?keywords=${q}`));
+    if (data) setPcWindows(data);
+  }
+
+  async function sendCertPassword() {
+    if (!certPassword) {
+      Alert.alert("Certificate", "Password is required.");
+      return;
+    }
+    const body = JSON.stringify({
+      password: certPassword,
+      press_enter: certPressEnter,
+      keywords: certWindowKeywords
+    });
+    const data = await run("cert password", () => api("/api/cert/type-password", { method: "POST", body }));
+    setCertPassword("");
+    if (data) {
+      Alert.alert("Certificate", `Typed ${data.chars_typed} chars into\n${data.window?.title || "PC window"}`);
+    }
   }
 
   async function refreshTop100() {
@@ -261,6 +288,26 @@ export default function App() {
               <Button title="Connect" onPress={connect} tone="primary" />
             </View>
             <Text style={styles.muted}>Connected: {String(status?.connected ?? false)}</Text>
+          </Section>
+
+          <Section title="PC Certificate">
+            <Field label="Window keywords" value={certWindowKeywords} onChangeText={setCertWindowKeywords} autoCapitalize="none" />
+            <Field label="Certificate password" value={certPassword} onChangeText={setCertPassword} secureTextEntry autoCapitalize="none" />
+            <TouchableOpacity style={styles.switchRow} onPress={() => setCertPressEnter(!certPressEnter)}>
+              <View style={[styles.checkbox, certPressEnter && styles.checkboxOn]} />
+              <Text style={styles.switchText}>Press Enter after typing {certPressEnter ? "ON" : "OFF"}</Text>
+            </TouchableOpacity>
+            <View style={styles.row}>
+              <Button title="Find Windows" onPress={refreshPcWindows} />
+              <Button title="Type to PC" onPress={sendCertPassword} tone="sell" />
+            </View>
+            {pcWindows.length === 0 ? <Text style={styles.muted}>Connect first, then send while the certificate password window is visible on the PC.</Text> : null}
+            {pcWindows.slice(0, 3).map((win) => (
+              <View key={`${win.hwnd}-${win.title}`} style={styles.windowRow}>
+                <Text style={styles.rowTitle} numberOfLines={1}>{win.title}</Text>
+                <Text style={styles.muted} numberOfLines={1}>{win.class_name}</Text>
+              </View>
+            ))}
           </Section>
 
           <Section title="Ticker">
@@ -609,6 +656,7 @@ const styles = StyleSheet.create({
   quoteBlock: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   position: { flexDirection: "row", justifyContent: "space-between", backgroundColor: "#111619", borderRadius: 7, padding: 10, gap: 10 },
   positionRight: { alignItems: "flex-end" },
+  windowRow: { backgroundColor: "#111619", borderRadius: 7, padding: 9, gap: 3 },
   chartBox: {
     backgroundColor: "#1b2022",
     borderColor: "#30383a",
