@@ -21,6 +21,8 @@ from src.broker.types import Order, OrderSide, OrderStatus, OrderType
 from src.broker.wmca import WmcaBroker
 from src.config import load_env, set_env_secret_loading_allowed
 from src.config.settings import load_wmca_settings
+from src.data.pykrx_provider import PykrxProvider
+from src.data.top100 import load_top100
 from src.data.usd_quote import LAOER_TICKER_POOL
 from src.live.laoer_auto import LaoerAutoConfig, LaoerAutoRunner
 from src.live.state import StateRepository
@@ -40,6 +42,7 @@ class BridgeState:
         self.state = StateRepository(db_path)
         self.dry_run_default = dry_run_default
         self.broker: WmcaBroker | None = None
+        self.history_provider = PykrxProvider(cache_ttl_seconds=60)
 
     def get_broker(self) -> WmcaBroker:
         if self.broker is None:
@@ -182,6 +185,32 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 "laoer_pool": LAOER_TICKER_POOL,
             }
 
+        if method == "GET" and path == "/api/top100":
+            limit = self._query_int(query, "limit", default=100, minimum=1, maximum=200)
+            market = (self._query_optional(query, "market") or "ALL").upper()
+            sort_by = self._query_optional(query, "sort") or "trading_value"
+            return [
+                item.to_dict()
+                for item in load_top100(limit=limit, market=market, sort_by=sort_by)
+            ]
+
+        if method == "GET" and path == "/api/chart":
+            ticker = self._query_one(query, "ticker").zfill(6)
+            count = self._query_int(query, "count", default=120, minimum=20, maximum=300)
+            frame = bridge.history_provider.get_ohlcv(ticker, count=count)
+            return [
+                {
+                    "date": str(row.get("date") or ""),
+                    "open": float(row.get("open") or 0),
+                    "high": float(row.get("high") or 0),
+                    "low": float(row.get("low") or 0),
+                    "close": float(row.get("close") or 0),
+                    "volume": int(row.get("volume") or 0),
+                    "trading_value": float(row.get("trading_value") or 0),
+                }
+                for row in frame.to_dict("records")
+            ]
+
         if method == "POST" and path == "/api/connect":
             with bridge.lock:
                 broker = bridge.get_broker()
@@ -294,6 +323,28 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if not value:
             raise BridgeError(HTTPStatus.BAD_REQUEST, f"missing query parameter: {key}")
         return value
+
+    @staticmethod
+    def _query_optional(query: dict[str, list[str]], key: str) -> str | None:
+        values = query.get(key) or []
+        value = values[0].strip() if values else ""
+        return value or None
+
+    @staticmethod
+    def _query_int(
+        query: dict[str, list[str]],
+        key: str,
+        *,
+        default: int,
+        minimum: int,
+        maximum: int,
+    ) -> int:
+        raw = BridgeHandler._query_optional(query, key)
+        try:
+            value = int(raw) if raw is not None else int(default)
+        except ValueError:
+            value = int(default)
+        return min(max(value, minimum), maximum)
 
     def _send_headers(self) -> None:
         self.send_header("Content-Type", "application/json; charset=utf-8")
